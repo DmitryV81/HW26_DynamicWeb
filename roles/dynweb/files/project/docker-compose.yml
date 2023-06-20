@@ -1,0 +1,87 @@
+version: '3.5'
+
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  database:
+    image: mysql:8.0
+    container_name: database
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - ./dbdata:/var/lib/mysql
+    command: '--default-authentication-plugin=mysql_native_password'
+    networks:
+      - app-network
+
+  wordpress:
+    image: wordpress:5.1.1-fpm-alpine
+    container_name: wordpress
+    restart: unless-stopped
+    environment:
+      WORDPRESS_DB_HOST: database
+      WORDPRESS_DB_NAME: "${DB_NAME}"
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: "${DB_ROOT_PASSWORD}"
+    volumes:
+      - ./wordpress:/var/www/html
+    networks:
+      - app-network
+    depends_on:
+      - database
+  redis:
+    image: 'redislabs/redismod'
+    ports:
+      - '6379:6379'
+    networks:
+      - app-network
+  web1:
+    restart: on-failure
+    build: ./web
+    hostname: web1
+    ports:
+      - '81:5000'
+    networks:
+      - app-network
+  web2:
+    restart: on-failure
+    build: ./web
+    hostname: web2
+    ports:
+      - '82:5000'
+    networks:
+      - app-network
+
+  app: 
+    build:
+      context: app
+      target: builder
+    stop_signal: SIGINT
+    ports: 
+      - '8000:8000'
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:1.15.12-alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - 8083:8083
+      - 8081:8081
+      - 8082:8082
+    volumes:
+      - ./wordpress:/var/www/html
+      - ./nginx-conf:/etc/nginx/conf.d
+    networks:
+      - app-network
+    depends_on:
+      - wordpress
+      #- app
+      - web1
+      - web2
+

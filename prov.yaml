@@ -1,0 +1,7 @@
+---
+- name: Deploy DynamicWeb from docker
+  hosts: DynamicWeb
+  become: true
+  roles:
+  - dynweb
+...
